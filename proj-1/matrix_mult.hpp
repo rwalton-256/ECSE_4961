@@ -438,12 +438,9 @@ void mul0( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res )
     assert( a.get_major_dim() == true );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul0" );
-
     res.initialize( 0.0F );
     for( unsigned i=0; i<res.rows(); i++ )
     {
-        t.update_progress( static_cast<float>(i) / res.rows() );
         for( unsigned j=0; j<res.cols(); j++ )
         {
             for( unsigned k=0; k<a.cols(); k++ )
@@ -464,12 +461,9 @@ void mul1( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned bloc
     assert( a.get_major_dim() == true );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul1" );
-
     res.initialize( 0.0F );
     for( unsigned i=0; i<res.rows(); i+=block_width )
     {
-        t.update_progress( static_cast<float>(i) / res.rows() );
         for( unsigned j=0; j<res.cols(); j+=block_width )
         {
             for( unsigned k=0; k<a.cols(); k+=block_width )
@@ -499,14 +493,11 @@ void mul2( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res )
     assert( a.get_major_dim() == true );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul2" );
-
     unsigned val_align = a.alignment();
 
     res.initialize( 0.0F );
     for( unsigned i=0; i<res.rows(); i+=val_align )
     {
-        t.update_progress( static_cast<float>(i) / res.rows() );
         for( unsigned j=0; j<res.cols(); j+=val_align )
         {
             for( unsigned k=0; k<a.cols(); k+=val_align )
@@ -585,14 +576,11 @@ void mul3( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned bloc
     assert( a.get_major_dim() == true );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul3" );
-
     unsigned val_align = a.alignment();
 
     res.initialize( 0.0F );
     for( unsigned i=0; i<res.rows(); i+=block_width )
     {
-        t.update_progress( static_cast<float>(i) / res.rows() );
         for( unsigned j=0; j<res.cols(); j+=block_width )
         {
             for( unsigned k=0; k<res.rows(); k+=block_width )
@@ -614,36 +602,33 @@ void mul3( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned bloc
                                                     res[ii+1][jj+((l+1)%8)],
                                                     res[ii+0][jj+((l+0)%8)]  );
                         }
-                        for( unsigned kk=k; kk<k+block_width && kk<a.cols(); kk+=val_align )
+                        for( unsigned kk=k; kk<k+block_width && kk<a.cols(); kk++ )
                         {
                             __m256 _a, _b;
-                            for( unsigned kkk=0; kkk<val_align && kk+kkk<a.cols(); kkk++ )
-                            {
-                                // Load in column vector from a and row vector from b
-                                _a = _mm256_set_ps( a[ii+7][kk+kkk],
-                                                    a[ii+6][kk+kkk],
-                                                    a[ii+5][kk+kkk],
-                                                    a[ii+4][kk+kkk],
-                                                    a[ii+3][kk+kkk],
-                                                    a[ii+2][kk+kkk],
-                                                    a[ii+1][kk+kkk],
-                                                    a[ii  ][kk+kkk]  );
-                                _b = _mm256_set_ps( b[kk+kkk][jj+7],
-                                                    b[kk+kkk][jj+6],
-                                                    b[kk+kkk][jj+5],
-                                                    b[kk+kkk][jj+4],
-                                                    b[kk+kkk][jj+3],
-                                                    b[kk+kkk][jj+2],
-                                                    b[kk+kkk][jj+1],
-                                                    b[kk+kkk][jj  ]  ); 
-                                // The vector product yields a diagonal of the result
-                                // matrix, rotate one vector each time to yield all diagonals
+                            // Load in column vector from a and row vector from b
+                            _a = _mm256_set_ps( a[ii+7][kk],
+                                                a[ii+6][kk],
+                                                a[ii+5][kk],
+                                                a[ii+4][kk],
+                                                a[ii+3][kk],
+                                                a[ii+2][kk],
+                                                a[ii+1][kk],
+                                                a[ii  ][kk]  );
+                            _b = _mm256_set_ps( b[kk][jj+7],
+                                                b[kk][jj+6],
+                                                b[kk][jj+5],
+                                                b[kk][jj+4],
+                                                b[kk][jj+3],
+                                                b[kk][jj+2],
+                                                b[kk][jj+1],
+                                                b[kk][jj  ]  ); 
+                            // The vector product yields a diagonal of the result
+                            // matrix, rotate one vector each time to yield all diagonals
 
-                                for( unsigned l=0; l<8; l++ )
-                                {
-                                    _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
-                                    _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
-                                }
+                            for( unsigned l=0; l<8; l++ )
+                            {
+                                _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
+                                _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
                             }
                         }
                         __attribute__ ((aligned (32))) float out[8][8];
@@ -678,15 +663,12 @@ void mul4( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned bloc
     assert( a.get_major_dim() == false );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul4" );
-
     unsigned val_align = a.alignment();
 
     res.initialize( 0.0F );
 
     for( unsigned i=0; i<res.rows(); i+=block_width )
     {
-        t.update_progress( static_cast<float>(i) / res.rows() );
         for( unsigned j=0; j<res.cols(); j+=block_width )
         {
             for( unsigned k=0; k<res.rows(); k+=block_width )
@@ -708,22 +690,20 @@ void mul4( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned bloc
                                                     res[ii+1][jj+((l+1)%8)],
                                                     res[ii+0][jj+((l+0)%8)]  );
                         }
-                        for( unsigned kk=k; kk<k+block_width && kk<a.cols(); kk+=val_align )
+
+                        for( unsigned kk=k; kk<k+block_width && kk<a.cols(); kk++ )
                         {
                             __m256 _a, _b;
-                            for( unsigned kkk=0; kkk<val_align && kk+kkk<a.cols(); kkk++ )
-                            {
-                                // Load in column vector from a and row vector from b
-                                _a = _mm256_load_ps( &a[kk+kkk][ii] );
-                                _b = _mm256_load_ps( &b[kk+kkk][jj] );
+                            // Load in column vector from a and row vector from b
+                            _a = _mm256_load_ps( &a[kk][ii] );
+                            _b = _mm256_load_ps( &b[kk][jj] );
 
-                                // The vector product yields a diagonal of the result
-                                // matrix, rotate one vector each time to yield all diagonals
-                                for( unsigned l=0; l<8; l++ )
-                                {
-                                    _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
-                                    _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
-                                }
+                            // The vector product yields a diagonal of the result
+                            // matrix, rotate one vector each time to yield all diagonals
+                            for( unsigned l=0; l<8; l++ )
+                            {
+                                _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
+                                _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
                             }
                         }
                         __attribute__ ((aligned (32))) float out[8][8];
@@ -769,8 +749,6 @@ void mul5( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned num_
     assert( a.get_major_dim() == false );
     assert( b.get_major_dim() == true );
 
-    Tracer t( "mul5" );
-
     unsigned val_align = a.alignment();
 
     res.initialize( 0.0F );
@@ -796,22 +774,19 @@ void mul5( const Matrix<T>& a, const Matrix<T>& b, Matrix<T>& res, unsigned num_
                                                res[ii+1][jj+((l+1)%8)],
                                                res[ii+0][jj+((l+0)%8)]  );
                     }
-                    for( unsigned kk=k; kk<k+block_depth && kk<a.cols(); kk+=val_align )
+                    for( unsigned kk=k; kk<k+block_depth && kk<a.cols(); kk++ )
                     {
                         __m256 _a, _b;
-                        for( unsigned kkk=0; kkk<val_align && kk+kkk<a.cols(); kkk++ )
-                        {
-                            // Load in column vector from a and row vector from b
-                            _a = _mm256_load_ps( &a[kk+kkk][ii] );
-                            _b = _mm256_load_ps( &b[kk+kkk][jj] );
+                        // Load in column vector from a and row vector from b
+                        _a = _mm256_load_ps( &a[kk][ii] );
+                        _b = _mm256_load_ps( &b[kk][jj] );
 
-                            // The vector product yields a diagonal of the result
-                            // matrix, rotate one vector each time to yield all diagonals
-                            for( unsigned l=0; l<8; l++ )
-                            {
-                                _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
-                                _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
-                            }
+                        // The vector product yields a diagonal of the result
+                        // matrix, rotate one vector each time to yield all diagonals
+                        for( unsigned l=0; l<8; l++ )
+                        {
+                            _r[l] = _mm256_fmadd_ps( _a, _b, _r[l] );
+                            _b = _mm256_permutevar8x32_ps( _b, _mm256_set_epi32(0,7,6,5,4,3,2,1));
                         }
                     }
                     __attribute__ ((aligned (32))) float out[8][8];

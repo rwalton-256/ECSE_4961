@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-mavx2 -march=native -std=c++17 -g -O3 -pthread
+CFLAGS=-mavx2 -march=native -std=c++17 -g -O3 -pthread -funroll-loops
 
 SRC+=matrix_mult.cpp
 SRC+=main.cpp

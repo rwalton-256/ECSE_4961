@@ -9,7 +9,7 @@
 
 int main( int argc, char** argv )
 {
-    unsigned s = 2000;
+    unsigned s = 10000;
 
     Matrix<float> x(s, s);
     x.initialize( 0.0F );
@@ -28,12 +28,30 @@ int main( int argc, char** argv )
     Matrix<float> r4(s, s);
     Matrix<float> r5(s, s);
 
-    mul5<float>( Matrix<float>(x, false), x, r5, 6, 296, 168 );
-    mul4<float>( Matrix<float>(x, false), x, r4 );
-    mul3<float>( x, x, r3 );
-    mul2<float>( x, x, r2 );
-    mul1<float>( x, x, r1 );
-    mul0<float>( x, x, r0 );
+    {
+        Tracer t( "mul5" );
+        mul5<float>( Matrix<float>(x, false), x, r5, 6, 296, 168 );
+    }
+    {
+        Tracer t( "mul4" );
+        mul4<float>( Matrix<float>(x, false), x, r4, 296 );
+    }
+    {
+        Tracer t( "mul3" );
+        mul3<float>( x, x, r3 );
+    }
+    {
+        Tracer t( "mul2" );
+        mul2<float>( x, x, r2 );
+    }
+    {
+        Tracer t( "mul1" );
+        mul1<float>( x, x, r1 );
+    }
+    {
+        Tracer t( "mul0" );
+        mul0<float>( x, x, r0 );
+    }
 
     assert( r0 == r1 );
     assert( r0 == r2 );

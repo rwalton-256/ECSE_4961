@@ -68,9 +68,11 @@ public:
         }
         if( progress < 0.0F ) progress = 0.0F;
         if( progress > 1.0F ) progress = 1.0F;
-        
+
+        std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - _mStartTime;
+
         std::cout << "\033[1A" << "\033[K"
                   << std::fixed << std::showpoint << std::setw( 5 ) << std::setprecision( 1 )
-                  << progress * 100.0F << "%" << std::endl;
+                  << progress * 100.0F << "% ---- " << elapsed.count() << "s" << std::endl;
     }
 };
