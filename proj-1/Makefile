@@ -9,7 +9,7 @@ LDIR =../lib
 
 LIBS=-lm
 
-_OBJ = main.o 
+_OBJ = main.o matrix_mult.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 

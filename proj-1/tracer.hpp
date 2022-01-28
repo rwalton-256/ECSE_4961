@@ -18,7 +18,7 @@ public:
         _mName( _aName ),
         progress_update( false )
     {
-        std::cout << "Task " << _mName << " started" << std::endl;
+        std::cout << "\033[33m" << "Task " << _mName << " started" << "\033[39m" << std::endl;
     }
     ~Tracer()
     {
@@ -31,7 +31,7 @@ public:
             std::cout << "\033[1A" << "\033[K";
         }
         std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - _mStartTime;
-        std::cout << "Task " << _mName << " Finished after " << std::setprecision( 6 ) << elapsed.count() << " seconds" << std::endl;
+        std::cout << "\033[32m" << "Task " << _mName << " finished after " << std::setprecision( 6 ) << elapsed.count() << " seconds" << "\033[39m" << std::endl;
         for( auto itr=_mTraceMap.begin(); itr!=_mTraceMap.end(); itr++ )
         {
             std::cout << "   sub_task " << itr->first << " took " << itr->second.count() << " seconds, "
