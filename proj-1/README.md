@@ -11,3 +11,7 @@ Please read `README.pdf`
 make
 ./matrix_multiplier
 ```
+
+## Hardware Env
+
+Intel® Core™ i7-9750H CPU @ 2.60GHz × 12 
