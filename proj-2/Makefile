@@ -22,6 +22,3 @@ zstd_custom: $(OBJ)
 
 clean:
 	rm -f $(ODIR)/*.o
-	rm -f huge_file.dat
-	rm -f comp_file.zst
-	rm -f uncomp_file.dat

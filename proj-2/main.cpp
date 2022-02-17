@@ -1,7 +1,6 @@
 #include <fstream>
 
 #include "zstd_comp.hpp"
-#include "tracer.hpp"
 
 int main( int argc, char** argv )
 {
