@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -50,6 +52,7 @@ public:
         {
             _mTraceMap[_mCurrTrace] = elapsed;
         }
+        _mCurrTrace = "";
     }
     void begin_trace( const std::string& _aTrace )
     {
