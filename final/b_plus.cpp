@@ -4,258 +4,6 @@
 #include <cstring>
 #include <string>
 
-B_Tree::Leaf_Node::Leaf_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
-{
-    _mInUse = 0;
-    _mPar = _aPar;
-    if( exists )
-    {
-        _mPar->fetch_node( this, _aNodeId );
-    }
-    else
-    {
-        _mSize = 0;
-        _mNodeId = _aNodeId;
-    }
-}
-
-B_Tree::Tree_Node::Tree_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
-{
-    _mPar = _aPar;
-    if( exists )
-    {
-        _mPar->fetch_node( this, _aNodeId );
-    }
-    else
-    {
-        _mSize = 0;
-        _mNodeId = _aNodeId;
-    }
-}
-
-B_Tree::Tree_Node::~Tree_Node()
-{
-    _mPar->store_node( this, _mNodeId );
-}
-
-B_Tree::Leaf_Node::~Leaf_Node()
-{
-    _mPar->store_node( this, _mNodeId );
-}
-
-void B_Tree::Leaf_Node::split( Node*& n )
-{
-    assert( _mSize == Leaf_Node_Order );
-    assert( _mNodeId );
-    _mInUse++;
-
-    uint32_t id;
-    Leaf_Node*& ptr = _mPar->new_leaf_node( id );
-    ptr = new Leaf_Node( _mPar, id );
-    n = ptr;
-
-    _mSize = Leaf_Node_Order / 2;
-
-    ptr->_mSize = Leaf_Node_Order - _mSize;
-    memcpy( &ptr->_mKeys[0], &_mKeys[_mSize], sizeof( Key ) * ptr->_mSize );
-    memcpy( &ptr->_mVals[0], &_mVals[_mSize], sizeof( Val ) * ptr->_mSize );
-    _mInUse--;
-};
-
-void B_Tree::Tree_Node::split( Node*& n )
-{
-    assert( _mSize == Tree_Node_Order );
-    uint32_t id;
-    Tree_Node*& ptr = _mPar->new_tree_node( id );
-    n = ptr;
-
-    _mSize = Leaf_Node_Order / 2;
-    ptr->_mSize = Leaf_Node_Order - _mSize;
-
-    memcpy( &ptr->_mChildNodes[ 0 ], &_mChildNodes[ _mSize ], sizeof( uint32_t ) * ptr->_mSize );
-    memcpy( &ptr->_mKeys[ 0 ], &_mKeys[ _mSize ], sizeof( Key ) * ( ptr->_mSize - 1 ) );
-}
-
-B_Tree::Node* B_Tree::Tree_Node::find( const Key& k )
-{
-    uint32_t idx = index( k );
-    return _mPar->unswizzle( _mChildNodes[ idx ] );
-}
-
-bool B_Tree::Tree_Node::find( const Key& k, Val& v )
-{
-    uint32_t idx = index( k );
-    return _mPar->unswizzle( _mChildNodes[idx] )->find( k, v );
-}
-
-bool B_Tree::Leaf_Node::find( const Key& k, Val& v )
-{
-    uint32_t idx = index( k );
-    if( idx != 0xffffffff )
-    {
-        memcpy( &v, &_mVals[ idx ], sizeof( Val ) );
-    }
-    return idx != 0xffffffff;
-}
-
-void B_Tree::insert( const Key& k, const Val& v )
-{
-    if( ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->_mSize == Tree_Node_Order )
-    {
-        Node* a;
-        Node* b;
-
-        a = unswizzle( _mHeader._mRootId );
-        a->split( b );
-
-        Tree_Node*& temp_root =  new_tree_node( _mHeader._mRootId );
-
-        temp_root->_mChildNodes[0] = a->node_id();
-        temp_root->_mChildNodes[1] = b->node_id();
-        temp_root->_mSize = 2;
-
-        temp_root->_mKeys[0] = unswizzle( ( (Tree_Node*) unswizzle( _mHeader._mRootId ) )->_mChildNodes[1] )->smallest();
-    }
-
-    unswizzle( _mHeader._mRootId )->insert( k, v );
-}
-
-void B_Tree::Tree_Node::insert( const Key& k, const Val& v )
-{
-    uint32_t i;
-
-    Node* ptr = find( k );
-
-    if( ptr->size() == ptr->max_size() )
-    {
-        Node* n;
-        ptr->split( n );
-
-        //ptr->print();
-        //n->print();
-
-        insert( n );
-        insert( k, v );
-    }
-    else
-    {
-        ptr->insert( k, v );
-    }
-}
-
-void B_Tree::Tree_Node::insert( const Node* v )
-{
-    assert( _mSize != Tree_Node_Order );
-    size_t split_index = index( v->largest() );
-
-    if( v->largest() > _mPar->unswizzle( _mChildNodes[split_index] )->largest() )
-    {
-        split_index++;
-    }
-
-    {
-        uint32_t* temp_nodes = new uint32_t[_mSize-split_index];
-
-        memcpy( temp_nodes, &_mChildNodes[split_index], ( _mSize-split_index ) * sizeof( uint32_t ) );
-        memcpy( &_mChildNodes[split_index+1], temp_nodes, ( _mSize-split_index ) * sizeof( uint32_t ) );
-        delete [] temp_nodes;
-        _mChildNodes[ split_index ] = v->node_id();
-    }
-
-    if( split_index )
-    {
-        Key* temp_keys = new Key[ _mSize - split_index ];
-
-        memcpy( temp_keys, &_mKeys[ split_index - 1 ], ( _mSize - split_index ) * sizeof( Key ) );
-        memcpy( &_mKeys[ split_index ], temp_keys, ( _mSize - split_index ) * sizeof( Key ) );
-        delete [] temp_keys;
-        _mKeys[ split_index - 1 ] = _mPar->unswizzle( _mChildNodes[ split_index ] )->smallest();
-    }
-    else
-    {
-        Key* temp_keys = new Key[ _mSize - 1 ];
-
-        memcpy( temp_keys, &_mKeys[ 0 ], _mSize - 1 );
-        memcpy( &_mKeys[ 1 ], temp_keys, _mSize - 1 );
-        delete [] temp_keys;
-        _mKeys[ 0 ] = _mPar->unswizzle( _mChildNodes[ 1 ] )->smallest();
-    }
-
-    _mSize++;
-}
-
-void B_Tree::Leaf_Node::insert( const Key& k, const Val& v )
-{
-    assert( _mSize != Leaf_Node_Order );
-
-    size_t split_index = _mSize;
-    for( size_t i=0; i<_mSize; i++ )
-    {
-        if( k == _mKeys[i] )
-        {
-            memcpy( &_mVals[i], &v, sizeof( Val ) );
-            return;
-        }
-        if( k < _mKeys[i] )
-        {
-            split_index = i;
-            break;
-        }
-    }
-
-    Key* temp_keys = new Key[_mSize-split_index];
-    Val* temp_vals = new Val[_mSize-split_index];
-
-    memcpy( temp_keys, &_mKeys[split_index], ( _mSize-split_index ) * sizeof( Key ) );
-    memcpy( &_mKeys[split_index+1], temp_keys, ( _mSize-split_index ) * sizeof( Key ) );
-
-    memcpy( temp_vals, &_mVals[split_index], ( _mSize-split_index ) * sizeof( Val ) );
-    memcpy( &_mVals[split_index+1], temp_vals, ( _mSize-split_index ) * sizeof( Val ) );
-
-    delete [] temp_keys;
-    delete [] temp_vals;
-
-    memcpy( &_mKeys[split_index], &k, sizeof( Key ) );
-    memcpy( &_mVals[split_index], &v, sizeof( Val ) );
-
-    _mSize++;
-}
-
-void B_Tree::print()
-{
-    std::cout << "B_Tree" << std::endl;
-    ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->print();
-}
-
-void B_Tree::Tree_Node::print( size_t depth ) const
-{
-    std::string s( depth, ' ' );
-    std::cout << s << "Tree_Node" << std::endl;
-    std::cout << s << "   ID: " << _mNodeId << std::endl;
-    std::cout << s << "   Size: " << _mSize << std::endl;
-    for( size_t i=0; i<_mSize; i++ )
-    {
-        _mPar->unswizzle( _mChildNodes[i] )->print( depth + 3 );
-        if( i<_mSize-1 )
-        {
-            std::cout << s << "   Key" << std::endl;
-            std::cout << s << "      " << std::hex << _mKeys[i] << std::endl;
-        }
-    }
-}
-
-void B_Tree::Leaf_Node::print( size_t depth ) const
-{
-    std::string s( depth, ' ' );
-    std::cout << s << "Leaf_Node" << std::endl;
-    std::cout << s << "   ID: " << _mNodeId << std::endl;
-    std::cout << s << "   Size: " << _mSize << std::endl;
-    for( size_t i=0; i<_mSize; i++ )
-    {
-        std::cout << s << "   " << std::hex << _mKeys[i] << std::endl;
-    }
-}
-
 B_Tree::B_Tree( std::string file_name )
     : _mLeafNodeMap( 0x1000 ),
       _mTracer( "B_Tree" ),
@@ -317,62 +65,45 @@ B_Tree::B_Tree( std::string file_name )
     }
 }
 
-uint32_t B_Tree::Leaf_Node::index( Key k, uint32_t start, uint32_t end ) const
+B_Tree::~B_Tree()
 {
-    if( start > end ) return 0xffffffff;
-    if( start == end ) return _mKeys[ start ] == k ? start : 0xffffffff;
+    _mTreeFile.seekp( 0, std::ios::beg );
+    _mTreeFile.write( (char*)&_mHeader._mPage, sizeof( Header::_mPage ) );
+    _mTreeFile.sync();
 
-    uint32_t mid = ( start + end ) / 2;
-
-    if( k < _mKeys[mid] )
+    for( uint32_t i=0; i<_mHeader._mNumTreeNodes; i++ )
     {
-        return index( k, start, mid );
+        delete _mTreeNodes[ i ];
     }
-    else
-    {
-        return index( k, mid + 1, end );
-    }
+    delete [] _mTreeNodes;
 }
 
-uint32_t B_Tree::Leaf_Node::index( Key k ) const
+void B_Tree::insert( const Key& k, const Val& v )
 {
-    assert( _mSize );
-    // If target lies beyond the max element, than the index of strictly smaller
-    // value than target should be (end - 1)
-    if( k > _mKeys[_mSize - 1] ) return 0xffffffff;
+    if( ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->_mSize == Tree_Node_Order )
+    {
+        Node* a;
+        Node* b;
 
-    return index( k, 0, _mSize -1 );
+        a = unswizzle( _mHeader._mRootId );
+        a->split( b );
+
+        Tree_Node*& temp_root =  new_tree_node( _mHeader._mRootId );
+
+        temp_root->_mChildNodes[0] = a->node_id();
+        temp_root->_mChildNodes[1] = b->node_id();
+        temp_root->_mSize = 2;
+
+        temp_root->_mKeys[0] = unswizzle( ( (Tree_Node*) unswizzle( _mHeader._mRootId ) )->_mChildNodes[1] )->smallest();
+    }
+
+    unswizzle( _mHeader._mRootId )->insert( k, v );
 }
 
-uint32_t B_Tree::Tree_Node::index( Key k, uint32_t start, uint32_t end ) const
+void B_Tree::print()
 {
-    if( start == end )
-    {
-        assert( k < _mKeys[start] );
-        return start;
-    }
-
-    int mid = start + (end - start) / 2;
-
-    if( k < _mKeys[ mid ] )
-    {
-        return index( k, start, mid );
-    }
-    else
-    {
-        return index( k, mid + 1, end );
-    }
-}
-
-uint32_t B_Tree::Tree_Node::index( Key k ) const
-{
-    assert( _mSize );
-
-    if( _mSize == 1 ) return 0;
-
-    if( k >= _mKeys[ _mSize - 2 ] ) return _mSize - 1;
-
-    return index( k, 0, _mSize - 2 );
+    std::cout << "B_Tree" << std::endl;
+    ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->print();
 }
 
 B_Tree::Node* B_Tree::unswizzle( uint32_t node_id )
@@ -463,19 +194,6 @@ void B_Tree::fetch_node( Leaf_Node* n, uint32_t idx )
     assert( idx >= Max_Num_Tree_Nodes );
     _mTreeFile.seekg( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * sizeof( Leaf_Node::_mPage ), std::ios::beg );
     _mTreeFile.read( (char*)&n->_mPage, sizeof( Leaf_Node::_mPage ) );
-}
-
-B_Tree::~B_Tree()
-{
-    _mTreeFile.seekp( 0, std::ios::beg );
-    _mTreeFile.write( (char*)&_mHeader._mPage, sizeof( Header::_mPage ) );
-    _mTreeFile.sync();
-
-    for( uint32_t i=0; i<_mHeader._mNumTreeNodes; i++ )
-    {
-        delete _mTreeNodes[ i ];
-    }
-    delete [] _mTreeNodes;
 }
 
 void B_Tree::clamp_size( float f )

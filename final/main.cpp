@@ -14,7 +14,7 @@ int main()
     {
         Tracer t( "test" );
 
-        for( size_t i=0; i<10000000; i++ )
+        for( size_t i=0; i<10000; i++ )
         {
             if( ! (i%10000) )
             {

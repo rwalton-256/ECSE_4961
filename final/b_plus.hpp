@@ -128,6 +128,21 @@ class B_Tree
         };
     };
 
+    typedef uint32_t Transaction_ID;
+
+    struct Transactions
+    {
+        union
+        {
+            struct
+            {
+                uint32_t _mNumTransactions;
+                Transaction_ID _mTransactions[100];
+            };
+            Page _mPage;
+        };
+    };
+
     void insert( const Key& k, const Val& v );
     void print();
     bool find( const Key& k, Val& v ) { return unswizzle( _mHeader._mRootId )->find( k, v ); }
@@ -137,7 +152,6 @@ class B_Tree
     Header _mHeader;
     std::fstream _mTreeFile;
     Hash_Map<uint32_t, Leaf_Node*> _mLeafNodeMap;
-    //
 
     Node* unswizzle( uint32_t node_id );
     Tree_Node*& new_tree_node( uint32_t& node_id );
