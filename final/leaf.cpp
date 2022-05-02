@@ -11,10 +11,21 @@ B_Tree::Leaf_Node::Leaf_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
     if( exists )
     {
         _mPar->fetch_node( this, _aNodeId );
+
+        for( uint32_t i=0; i<_mLogSize; i++ )
+        {
+            if( _mPar->log_valid( _mLogTxns[i] ) )
+            {
+                insert( _mLogKeys[i], _mLogVals[i], -1 );
+            }
+        }
     }
     else
     {
+        memset( &_mPage, 0, sizeof( _mPage ) );
+        memset( &_mLogPage, 0, sizeof( _mLogPage ) );
         _mSize = 0;
+        _mLogSize = 0;
         _mNodeId = _aNodeId;
     }
 }
@@ -53,41 +64,52 @@ bool B_Tree::Leaf_Node::find( const Key& k, Val& v )
     return idx != 0xffffffff;
 }
 
-void B_Tree::Leaf_Node::insert( const Key& k, const Val& v )
+void B_Tree::Leaf_Node::insert( const Key& k, const Val& v, Transaction_ID t )
 {
-    assert( _mSize != Leaf_Node_Order );
-
-    size_t split_index = _mSize;
-    for( size_t i=0; i<_mSize; i++ )
+    if( t == -1 )
     {
-        if( k == _mKeys[i] )
+        assert( _mSize != Leaf_Node_Order );
+
+        size_t split_index = _mSize;
+        for( size_t i=0; i<_mSize; i++ )
         {
-            memcpy( &_mVals[i], &v, sizeof( Val ) );
-            return;
+            if( k == _mKeys[i] )
+            {
+                memcpy( &_mVals[i], &v, sizeof( Val ) );
+                return;
+            }
+            if( k < _mKeys[i] )
+            {
+                split_index = i;
+                break;
+            }
         }
-        if( k < _mKeys[i] )
-        {
-            split_index = i;
-            break;
-        }
+
+        Key* temp_keys = new Key[_mSize-split_index];
+        Val* temp_vals = new Val[_mSize-split_index];
+
+        memcpy( temp_keys, &_mKeys[split_index], ( _mSize-split_index ) * sizeof( Key ) );
+        memcpy( &_mKeys[split_index+1], temp_keys, ( _mSize-split_index ) * sizeof( Key ) );
+
+        memcpy( temp_vals, &_mVals[split_index], ( _mSize-split_index ) * sizeof( Val ) );
+        memcpy( &_mVals[split_index+1], temp_vals, ( _mSize-split_index ) * sizeof( Val ) );
+
+        delete [] temp_keys;
+        delete [] temp_vals;
+
+        memcpy( &_mKeys[split_index], &k, sizeof( Key ) );
+        memcpy( &_mVals[split_index], &v, sizeof( Val ) );
+
+        _mSize++;
     }
-
-    Key* temp_keys = new Key[_mSize-split_index];
-    Val* temp_vals = new Val[_mSize-split_index];
-
-    memcpy( temp_keys, &_mKeys[split_index], ( _mSize-split_index ) * sizeof( Key ) );
-    memcpy( &_mKeys[split_index+1], temp_keys, ( _mSize-split_index ) * sizeof( Key ) );
-
-    memcpy( temp_vals, &_mVals[split_index], ( _mSize-split_index ) * sizeof( Val ) );
-    memcpy( &_mVals[split_index+1], temp_vals, ( _mSize-split_index ) * sizeof( Val ) );
-
-    delete [] temp_keys;
-    delete [] temp_vals;
-
-    memcpy( &_mKeys[split_index], &k, sizeof( Key ) );
-    memcpy( &_mVals[split_index], &v, sizeof( Val ) );
-
-    _mSize++;
+    else
+    {
+        assert( _mLogSize != Log_Size );
+        _mLogKeys[ _mLogSize ] = k;
+        _mLogVals[ _mLogSize ] = v;
+        _mLogTxns[ _mLogSize ] = t;
+        _mLogSize++;
+    }
 }
 
 void B_Tree::Leaf_Node::print( size_t depth ) const
@@ -98,7 +120,7 @@ void B_Tree::Leaf_Node::print( size_t depth ) const
     std::cout << s << "   Size: " << _mSize << std::endl;
     for( size_t i=0; i<_mSize; i++ )
     {
-        std::cout << s << "   " << std::hex << _mKeys[i] << std::endl;
+        std::cout << s << "   " << std::hex << _mKeys[i] << "   \"" << (char*)_mVals[i].val << "\"" << std::endl;
     }
 }
 

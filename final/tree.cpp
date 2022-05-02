@@ -13,6 +13,7 @@ B_Tree::Tree_Node::Tree_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
     }
     else
     {
+        memset( &_mPage, 0, sizeof( _mPage ) );
         _mSize = 0;
         _mNodeId = _aNodeId;
     }
@@ -49,7 +50,7 @@ bool B_Tree::Tree_Node::find( const Key& k, Val& v )
     return _mPar->unswizzle( _mChildNodes[idx] )->find( k, v );
 }
 
-void B_Tree::Tree_Node::insert( const Key& k, const Val& v )
+void B_Tree::Tree_Node::insert( const Key& k, const Val& v, Transaction_ID t )
 {
     uint32_t i;
 
@@ -64,11 +65,11 @@ void B_Tree::Tree_Node::insert( const Key& k, const Val& v )
         //n->print();
 
         insert( n );
-        insert( k, v );
+        insert( k, v, t );
     }
     else
     {
-        ptr->insert( k, v );
+        ptr->insert( k, v, t );
     }
 }
 
