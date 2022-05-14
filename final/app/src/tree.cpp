@@ -9,7 +9,6 @@ B_Tree::Tree_Node::Tree_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
     _mPar = _aPar;
     if( exists )
     {
-     
         _mPar->fetch_node( this, _aNodeId );
     }
     else
@@ -30,7 +29,7 @@ void B_Tree::Tree_Node::split( Node*& n )
 {
     assert( _mSize == Tree_Node_Order );
     uint32_t id;
-    Tree_Node*& ptr = _mPar->new_tree_node( id );
+    Tree_Node* ptr = _mPar->new_tree_node( id );
     n = ptr;
 
     _mSize = Leaf_Node_Order / 2;
@@ -40,13 +39,13 @@ void B_Tree::Tree_Node::split( Node*& n )
     memcpy( &ptr->_mKeys[ 0 ], &_mKeys[ _mSize ], sizeof( Key ) * ( ptr->_mSize - 1 ) );
 }
 
-B_Tree::Node* B_Tree::Tree_Node::find( const Key& k )
+B_Tree::Node* B_Tree::Tree_Node::find( const Key& k ) const
 {
     uint32_t idx = index( k );
     return _mPar->unswizzle( _mChildNodes[ idx ] );
 }
 
-bool B_Tree::Tree_Node::find( const Key& k, Val& v )
+bool B_Tree::Tree_Node::find( const Key& k, Val& v ) const
 {
     uint32_t idx = index( k );
     return _mPar->unswizzle( _mChildNodes[idx] )->find( k, v );

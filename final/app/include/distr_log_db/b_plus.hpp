@@ -14,8 +14,8 @@ class B_Tree
 {
     public:
 
-    static constexpr uint32_t Tree_Node_Order = 25;
-    static constexpr uint32_t Leaf_Node_Order = 25;
+    static constexpr uint32_t Tree_Node_Order = 10;
+    static constexpr uint32_t Leaf_Node_Order = 10;
     static constexpr uint32_t Log_Size = 5;
 
     static constexpr uint32_t Max_Num_Tree_Nodes = 10;
@@ -63,7 +63,7 @@ class B_Tree
     struct Node
     {
         virtual void split( Node*& b ) = 0;
-        virtual bool find( const Key& k, Val& v ) = 0;
+        virtual bool find( const Key& k, Val& v ) const = 0;
         virtual void insert( const Key& k, const Val& v, Txn t ) = 0;
         virtual Key largest() const = 0;
         virtual Key smallest() const = 0;
@@ -92,7 +92,7 @@ class B_Tree
                 Page _mPage;
             };
             void insert( const Key& k, const Val& v );
-            bool find( const Key& k, Val& v );
+            bool find( const Key& k, Val& v ) const;
             uint32_t index( Key k, uint32_t start, uint32_t end ) const;
             uint32_t index( Key k ) const;
             void remove( Key k );
@@ -122,15 +122,18 @@ class B_Tree
         bool _mDataModified;
 
         void split( Node*& b );
-        bool find( const Key& k, Val& v );
+        void shorten_log();
         void insert( const Key& k, const Val& v, Txn t );
+        void persist();
+
+        bool find( const Key& k, Val& v ) const;
         Key largest() const { return _mCurrent._mKVs[ _mCurrent._mSize-1 ].k; }
         Key smallest() const { return _mCurrent._mKVs[ 0 ].k; }
         uint32_t size() const  { return _mCurrent._mSize; }
         uint32_t max_size() const { return Leaf_Node_Order; };
         void print( size_t depth = 0 ) const;
-        void shorten_log();
         uint32_t node_id() const { return _mNodeId; }
+        TxnState state( Key k ) const;
 
         Leaf_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists=false );
         ~Leaf_Node();
@@ -152,8 +155,8 @@ class B_Tree
         };
 
         void split( Node*& b );
-        bool find( const Key& k, Val& v );
-        Node* find( const Key& k );
+        bool find( const Key& k, Val& v ) const;
+        Node* find( const Key& k ) const;
         void insert( const Key& k, const Val& v, Txn t );
         void insert( const Node* v );
         Key largest() const { return _mPar->unswizzle( _mChildNodes [ _mSize-1 ] )->largest(); }
@@ -213,8 +216,8 @@ class B_Tree
     Hash_Map<uint32_t, Leaf_Node*> _mLeafNodeMap;
 
     Node* unswizzle( uint32_t node_id );
-    Tree_Node*& new_tree_node( uint32_t& node_id );
-    Leaf_Node*& new_leaf_node( uint32_t& node_id );
+    Tree_Node* new_tree_node( uint32_t& node_id );
+    Leaf_Node* new_leaf_node( uint32_t& node_id );
     void clamp_size( float f );
 
     void store_node( Tree_Node* n, uint32_t idx );

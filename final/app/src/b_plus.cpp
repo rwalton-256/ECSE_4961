@@ -4,6 +4,13 @@
 #include <cstring>
 #include <string>
 
+/**
+ * @brief Construct a new b tree::b tree object. Attempts to load data from
+ * database located in file system, if it fails it will create a new database
+ * 
+ * @param file_name 
+ * @param reset If set to true, file will be overwritten with new database
+ */
 B_Tree::B_Tree( std::string file_name, bool reset )
     : _mLeafNodeMap( 8 ),
       _mTreeFile( file_name, std::ios::in | std::ios::out | std::ios::binary )
@@ -45,10 +52,10 @@ B_Tree::B_Tree( std::string file_name, bool reset )
         _mHeader._mNumLeafNodes = 0;
         _mHeader._mNumTreeNodes = 0;
 
-        Tree_Node*& temp_root = new_tree_node( _mHeader._mRootId );
+        Tree_Node* temp_root = new_tree_node( _mHeader._mRootId );
 
         uint32_t leaf_node_id;
-        Leaf_Node*& temp_leaf = new_leaf_node( leaf_node_id );
+        Leaf_Node* temp_leaf = new_leaf_node( leaf_node_id );
 
         _mRoot()->_mChildNodes[0] = temp_leaf->_mNodeId;
         _mRoot()->_mSize = 1;
@@ -69,6 +76,10 @@ B_Tree::B_Tree( std::string file_name, bool reset )
     }
 }
 
+/**
+ * @brief Destroy the B_Tree object
+ * 
+ */
 B_Tree::~B_Tree()
 {
     _mTreeFile.seekp( 0, std::ios::beg );
@@ -82,6 +93,13 @@ B_Tree::~B_Tree()
     delete [] _mTreeNodes;
 }
 
+/**
+ * @brief Insert key value pair into database with current transaction number
+ * 
+ * @param k 
+ * @param v 
+ * @param t 
+ */
 void B_Tree::insert( const Key& k, const Val& v, Txn t )
 {
     if( _mRoot()->_mSize == Tree_Node_Order )
@@ -92,7 +110,7 @@ void B_Tree::insert( const Key& k, const Val& v, Txn t )
         a = _mRoot();
         a->split( b );
 
-        Tree_Node*& temp_root =  new_tree_node( _mHeader._mRootId );
+        Tree_Node* temp_root =  new_tree_node( _mHeader._mRootId );
         sync_header_txns();
 
         temp_root->_mChildNodes[0] = a->node_id();
@@ -105,12 +123,24 @@ void B_Tree::insert( const Key& k, const Val& v, Txn t )
     _mRoot()->insert( k, v, t );
 }
 
+/**
+ * @brief Prints the B_Tree
+ * 
+ */
 void B_Tree::print()
 {
     std::cout << "B_Tree" << std::endl;
     ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->print();
 }
 
+/**
+ * @brief Translates node identification number into usable pointer to
+ * memory where node is stored. If node doesn't exist in memory, it will
+ * be pulled in from the file system.
+ * 
+ * @param node_id Node Identification Number
+ * @return B_Tree::Node* Pointer to node location in memory
+ */
 B_Tree::Node* B_Tree::unswizzle( uint32_t node_id )
 {
     assert( node_id < Max_Num_Leaf_Nodes + Max_Num_Tree_Nodes );
@@ -137,7 +167,15 @@ B_Tree::Node* B_Tree::unswizzle( uint32_t node_id )
     }
 }
 
-B_Tree::Tree_Node*& B_Tree::new_tree_node( uint32_t& node_id )
+/**
+ * @brief Contructs a tree node with next available ID, and returns
+ * a pointer to the new node
+ * 
+ * @param node_id Reference to identification number to be set with
+ * new node id
+ * @return B_Tree::Tree_Node* Pointer to the new node
+ */
+B_Tree::Tree_Node* B_Tree::new_tree_node( uint32_t& node_id )
 {
     assert( _mHeader._mNumTreeNodes != Max_Num_Tree_Nodes );
     node_id = _mHeader._mNumTreeNodes;
@@ -147,7 +185,16 @@ B_Tree::Tree_Node*& B_Tree::new_tree_node( uint32_t& node_id )
     return _mTreeNodes[node_id];
 }
 
-B_Tree::Leaf_Node*& B_Tree::new_leaf_node( uint32_t& node_id )
+/**
+ * @brief Contructs a leaf node with next available ID, and returns
+ * a pointer to the new node. The node is stored in the leaf node
+ * hash table.
+ * 
+ * @param node_id Reference to identification number to be set with
+ * new node id
+ * @return B_Tree::Leaf_Node* Pointer to the new node
+ */
+B_Tree::Leaf_Node* B_Tree::new_leaf_node( uint32_t& node_id )
 {
     assert( _mHeader._mNumLeafNodes != Max_Num_Leaf_Nodes );
     node_id = _mHeader._mNumLeafNodes + Max_Num_Tree_Nodes;
@@ -161,6 +208,13 @@ B_Tree::Leaf_Node*& B_Tree::new_leaf_node( uint32_t& node_id )
     return _mLeafNodeMap.find( node_id ).val;
 }
 
+/**
+ * @brief Prints B_Tree recursively to provided std::ostream
+ * 
+ * @param os 
+ * @param p 
+ * @return std::ostream& 
+ */
 std::ostream& operator<<( std::ostream& os, const B_Tree::Page& p )
 {
     std::cout << "Page:";
@@ -173,6 +227,12 @@ std::ostream& operator<<( std::ostream& os, const B_Tree::Page& p )
     return os;
 }
 
+/**
+ * @brief Writes appropriate data to file system
+ * 
+ * @param n Pointer to tree node
+ * @param idx 
+ */
 void B_Tree::store_node( Tree_Node* n, uint32_t idx )
 {
     _mTreeFile.seekp( Tree_Node_Offset + idx * sizeof( Tree_Node::_mPage ), std::ios::beg );
@@ -182,6 +242,7 @@ void B_Tree::store_node( Tree_Node* n, uint32_t idx )
 
 void B_Tree::store_node( Leaf_Node* n, uint32_t idx )
 {
+    std::cout << "Storing: " << idx << std::endl;
     assert( idx >= Max_Num_Tree_Nodes );
     if( n->_mDataModified )
     {
@@ -207,6 +268,7 @@ void B_Tree::fetch_node( Tree_Node* n, uint32_t idx )
 
 void B_Tree::fetch_node( Leaf_Node* n, uint32_t idx )
 {
+    std::cout << "Fetching: " << idx << std::endl;
     assert( idx >= Max_Num_Tree_Nodes );
     _mTreeFile.seekg( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ), std::ios::beg );
     _mTreeFile.read( (char*)&n->_mStored, sizeof( Leaf_Node::_mStored ) );

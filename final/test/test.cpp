@@ -15,7 +15,7 @@ int main()
         B_Tree b( "foo.dtb", true );
 
         // Add 15 random initial values
-        for( size_t i=0; i<10; i++ )
+        for( size_t i=0; i<50; i++ )
         {
             B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
 
@@ -24,6 +24,7 @@ int main()
             B_Tree::Txn t = b.new_txn();
             b.insert( k, v, t );
             b.txn_commit( t );
+            b.print();
         }
     }
 
@@ -45,6 +46,8 @@ int main()
         B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
         snprintf( (char*)v.val, sizeof( v.val ), "0x%08x", k );
         b.insert( k, v, t );
+
+        b.print();
 
         // Call b tree destructor to emulate system crash before transaction
         // can be completed.
