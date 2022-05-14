@@ -47,6 +47,8 @@ B_Tree::Leaf_Node::~Leaf_Node()
 
 void B_Tree::Leaf_Node::persist()
 {
+    snprintf( _mStored.foo, sizeof( _mStored.foo ), "\nLeafData: %02x\n", _mNodeId );
+    snprintf( _mLog.foo, sizeof( _mLog.foo ), "\nLeafLog: %02x\n", _mNodeId );
     _mPar->store_node( this, _mNodeId );
     _mDirty = false;
 }
@@ -82,6 +84,11 @@ void B_Tree::Leaf_Node::split( Node*& n )
 
     memcpy( &ptr->_mStored._mKVs[ 0 ], &_mStored._mKVs[ s_idx ], ptr->_mStored._mSize * sizeof( KeyVal ) );
     memset( &_mStored._mKVs[ _mStored._mSize], 0, ptr->_mStored._mSize * sizeof( KeyVal ) );
+
+    _mDataModified = true;
+    ptr->_mDataModified = true;
+
+    ptr->_mDirty = true;
 
     _mInUse--;
 };

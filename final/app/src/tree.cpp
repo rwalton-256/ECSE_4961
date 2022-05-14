@@ -62,9 +62,6 @@ void B_Tree::Tree_Node::insert( const Key& k, const Val& v, Txn t )
         Node* n;
         ptr->split( n );
 
-        //ptr->print();
-        //n->print();
-
         insert( n );
         insert( k, v, t );
     }

@@ -14,8 +14,8 @@ int main()
         // Instantiate b tree, with reset TRUE
         B_Tree b( "foo.dtb", true );
 
-        // Add 15 random initial values
-        for( size_t i=0; i<50; i++ )
+        // Add 7 random initial values
+        for( size_t i=0; i<7; i++ )
         {
             B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
 
@@ -24,7 +24,6 @@ int main()
             B_Tree::Txn t = b.new_txn();
             b.insert( k, v, t );
             b.txn_commit( t );
-            b.print();
         }
     }
 
@@ -60,7 +59,6 @@ int main()
         std::cout << std::endl;
     }
 
-
     {
         // Reopen b tree
         B_Tree b( "foo.dtb" );
@@ -85,19 +83,18 @@ int main()
     }
 
     {
-        // Reopen tree to verify previous insertion persisted
         B_Tree b( "foo.dtb" );
 
-        // Create a second transaction
-        B_Tree::Txn t = b.new_txn();
+        for( size_t i=0; i<300; i++ )
+        {
+            B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
 
-        // Add value to b tree as a transaction
-        B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
-        snprintf( (char*)v.val, sizeof( v.val ), "0x%08x", k );
-        b.insert( k, v, t );
+            snprintf( (char*)v.val, sizeof( v.val ), "0x%08x", k );
 
-        // Commit transaction to ensure value persists
-        b.txn_commit( t );
+            B_Tree::Txn t = b.new_txn();
+            b.insert( k, v, t );
+            b.txn_commit( t );
+        }
     }
 
     {

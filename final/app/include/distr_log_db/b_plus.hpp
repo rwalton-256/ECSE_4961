@@ -16,7 +16,7 @@ class B_Tree
 
     static constexpr uint32_t Tree_Node_Order = 10;
     static constexpr uint32_t Leaf_Node_Order = 10;
-    static constexpr uint32_t Log_Size = 5;
+    static constexpr uint32_t Log_Size = 2;
 
     static constexpr uint32_t Max_Num_Tree_Nodes = 10;
     static constexpr uint32_t Max_Num_Leaf_Nodes = 100;
@@ -57,7 +57,7 @@ class B_Tree
 
     struct Page
     {
-        uint8_t _raw_[ 1024 ];
+        uint8_t _raw_[ 256 ];
     };
 
     struct Node

@@ -242,11 +242,9 @@ void B_Tree::store_node( Tree_Node* n, uint32_t idx )
 
 void B_Tree::store_node( Leaf_Node* n, uint32_t idx )
 {
-    std::cout << "Storing: " << idx << std::endl;
     assert( idx >= Max_Num_Tree_Nodes );
     if( n->_mDataModified )
     {
-        std::cout << "Modifying data segment" << std::endl;
         _mTreeFile.seekp( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ), std::ios::beg );
         _mTreeFile.write( (char*)&n->_mStored, sizeof( Leaf_Node::_mStored ) );
         _mTreeFile.write( (char*)&n->_mLog, sizeof( Leaf_Node::_mLog ) );
@@ -268,7 +266,6 @@ void B_Tree::fetch_node( Tree_Node* n, uint32_t idx )
 
 void B_Tree::fetch_node( Leaf_Node* n, uint32_t idx )
 {
-    std::cout << "Fetching: " << idx << std::endl;
     assert( idx >= Max_Num_Tree_Nodes );
     _mTreeFile.seekg( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ), std::ios::beg );
     _mTreeFile.read( (char*)&n->_mStored, sizeof( Leaf_Node::_mStored ) );
