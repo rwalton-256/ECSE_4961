@@ -1,4 +1,4 @@
-#include "b_plus.hpp"
+#include "distr_log_db/b_plus.hpp"
 
 #include <cassert>
 #include <cstring>
@@ -50,10 +50,8 @@ B_Tree::B_Tree( std::string file_name, bool reset )
         uint32_t leaf_node_id;
         Leaf_Node*& temp_leaf = new_leaf_node( leaf_node_id );
 
-        ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->_mChildNodes[0] = temp_leaf->_mNodeId;
-        ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->_mSize = 1;
-
-        temp_leaf->_mSize = 0;
+        _mRoot()->_mChildNodes[0] = temp_leaf->_mNodeId;
+        _mRoot()->_mSize = 1;
     }
     else
     {
@@ -84,14 +82,14 @@ B_Tree::~B_Tree()
     delete [] _mTreeNodes;
 }
 
-void B_Tree::insert( const Key& k, const Val& v, Transaction_ID t )
+void B_Tree::insert( const Key& k, const Val& v, Txn t )
 {
-    if( ( (Tree_Node*)unswizzle( _mHeader._mRootId ) )->_mSize == Tree_Node_Order )
+    if( _mRoot()->_mSize == Tree_Node_Order )
     {
         Node* a;
         Node* b;
 
-        a = unswizzle( _mHeader._mRootId );
+        a = _mRoot();
         a->split( b );
 
         Tree_Node*& temp_root =  new_tree_node( _mHeader._mRootId );
@@ -101,10 +99,10 @@ void B_Tree::insert( const Key& k, const Val& v, Transaction_ID t )
         temp_root->_mChildNodes[1] = b->node_id();
         temp_root->_mSize = 2;
 
-        temp_root->_mKeys[0] = unswizzle( ( (Tree_Node*) unswizzle( _mHeader._mRootId ) )->_mChildNodes[1] )->smallest();
+        temp_root->_mKeys[0] = unswizzle( _mRoot()->_mChildNodes[1] )->smallest();
     }
 
-    unswizzle( _mHeader._mRootId )->insert( k, v, t );
+    _mRoot()->insert( k, v, t );
 }
 
 void B_Tree::print()
@@ -185,12 +183,19 @@ void B_Tree::store_node( Tree_Node* n, uint32_t idx )
 void B_Tree::store_node( Leaf_Node* n, uint32_t idx )
 {
     assert( idx >= Max_Num_Tree_Nodes );
-    _mTreeFile.seekp( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * sizeof( Leaf_Node::_mPage ), std::ios::beg );
-    _mTreeFile.write( (char*)&n->_mPage, sizeof( Leaf_Node::_mPage ) );
-    
-    _mTreeFile.seekp( Leaf_Log_Offset + ( idx - Max_Num_Tree_Nodes ) * sizeof( Leaf_Node::_mLogPage ), std::ios::beg );
-    _mTreeFile.write( (char*)&n->_mLogPage, sizeof( Leaf_Node::_mLogPage ) );
-    
+    if( n->_mDataModified )
+    {
+        std::cout << "Modifying data segment" << std::endl;
+        _mTreeFile.seekp( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ), std::ios::beg );
+        _mTreeFile.write( (char*)&n->_mStored, sizeof( Leaf_Node::_mStored ) );
+        _mTreeFile.write( (char*)&n->_mLog, sizeof( Leaf_Node::_mLog ) );
+    }
+    else
+    {
+        _mTreeFile.seekp( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ) + sizeof( Leaf_Node::_mStored ), std::ios::beg );
+        _mTreeFile.write( (char*)&n->_mLog, sizeof( Leaf_Node::_mLog ) );
+    }
+
     _mTreeFile.sync();
 }
 
@@ -203,11 +208,9 @@ void B_Tree::fetch_node( Tree_Node* n, uint32_t idx )
 void B_Tree::fetch_node( Leaf_Node* n, uint32_t idx )
 {
     assert( idx >= Max_Num_Tree_Nodes );
-    _mTreeFile.seekg( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * sizeof( Leaf_Node::_mPage ), std::ios::beg );
-    _mTreeFile.read( (char*)&n->_mPage, sizeof( Leaf_Node::_mPage ) );
-
-    _mTreeFile.seekg( Leaf_Log_Offset + ( idx - Max_Num_Tree_Nodes ) * sizeof( Leaf_Node::_mLogPage), std::ios::beg );
-    _mTreeFile.read( (char*)&n->_mLogPage, sizeof( Leaf_Node::_mLogPage ) );
+    _mTreeFile.seekg( Leaf_Node_Offset + ( idx - Max_Num_Tree_Nodes ) * ( sizeof( Leaf_Node::_mStored ) + sizeof( Leaf_Node::_mLog ) ), std::ios::beg );
+    _mTreeFile.read( (char*)&n->_mStored, sizeof( Leaf_Node::_mStored ) );
+    _mTreeFile.read( (char*)&n->_mLog, sizeof( Leaf_Node::_mLog ) );
 }
 
 void B_Tree::sync_header_txns()
@@ -238,29 +241,29 @@ void B_Tree::clamp_size( float f )
     }
 }
 
-void B_Tree::remove_txn( Transactions& txns, Transaction_ID t )
+void B_Tree::remove_txn( Transactions& txns, Txn t )
 {
     for( uint32_t i=0; i<txns._mNumTransactions; i++ )
     {
         if( txns._mTransactions[ i ] == t )
         {
-            Transaction_ID* txns_ptr = new Transaction_ID[ txns._mNumTransactions - i - 1 ];
-            memcpy( txns_ptr, &txns._mTransactions[ i + 1 ], ( txns._mNumTransactions - i - 1 ) * sizeof( Transaction_ID ) );
-            memcpy( &txns._mTransactions[ i ], txns_ptr, ( txns._mNumTransactions - i - 1 ) * sizeof( Transaction_ID ) );
+            Txn* txns_ptr = new Txn[ txns._mNumTransactions - i - 1 ];
+            memcpy( txns_ptr, &txns._mTransactions[ i + 1 ], ( txns._mNumTransactions - i - 1 ) * sizeof( Txn ) );
+            memcpy( &txns._mTransactions[ i ], txns_ptr, ( txns._mNumTransactions - i - 1 ) * sizeof( Txn ) );
             txns._mNumTransactions--;
             break;
         }
     }
 }
 
-void B_Tree::add_txn( Transactions& txns, Transaction_ID t )
+void B_Tree::add_txn( Transactions& txns, Txn t )
 {
     assert( txns._mNumTransactions != Max_Num_Txns );
     txns._mTransactions[ txns._mNumTransactions ] = t;
     txns._mNumTransactions++;
 }
 
-B_Tree::Transaction_ID B_Tree::new_txn()
+B_Tree::Txn B_Tree::new_txn()
 {
     _mHeader._mRecentTransaction++;
     add_txn( _mCurrTxns, _mHeader._mRecentTransaction );
@@ -268,27 +271,39 @@ B_Tree::Transaction_ID B_Tree::new_txn()
     return _mHeader._mRecentTransaction;
 }
 
-void B_Tree::txn_commit( Transaction_ID t )
+void B_Tree::txn_commit( Txn t )
 {
     remove_txn( _mCurrTxns, t );
     sync_header_txns();
 }
 
-void B_Tree::txn_abort( Transaction_ID t )
+void B_Tree::txn_abort( Txn t )
 {
     remove_txn( _mCurrTxns, t );
     add_txn( _mAbortTxns, t );
     sync_header_txns();
 }
 
-bool B_Tree::log_valid( Transaction_ID t )
+B_Tree::TxnState B_Tree::txn_state( Txn t )
 {
     for( uint32_t i=0; i<_mAbortTxns._mNumTransactions; i++ )
     {
         if( _mAbortTxns._mTransactions[ i ] == t )
         {
-            return false;
+            return TxnState_Aborted;
         }
     }
-    return true;
+    for( uint32_t i=0; i<_mCurrTxns._mNumTransactions; i++ )
+    {
+        if( _mCurrTxns._mTransactions[ i ] == t )
+        {
+            return TxnState_Current;
+        }
+    }
+    return TxnState_Committed;
+}
+
+B_Tree::Tree_Node* B_Tree::_mRoot()
+{
+    return (Tree_Node*)unswizzle( _mHeader._mRootId );
 }

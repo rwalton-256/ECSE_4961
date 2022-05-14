@@ -1,6 +1,6 @@
-#include "b_plus.hpp"
+#include "distr_log_db/b_plus.hpp"
 
-#include "tracer.hpp"
+#include "distr_log_db/tracer.hpp"
 
 #include <fstream>
 #include <cstring>
@@ -15,13 +15,15 @@ int main()
         B_Tree b( "foo.dtb", true );
 
         // Add 15 random initial values
-        for( size_t i=0; i<15; i++ )
+        for( size_t i=0; i<10; i++ )
         {
             B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
 
             snprintf( (char*)v.val, sizeof( v.val ), "0x%08x", k );
 
-            b.insert( k, v, -1 );
+            B_Tree::Txn t = b.new_txn();
+            b.insert( k, v, t );
+            b.txn_commit( t );
         }
     }
 
@@ -37,7 +39,7 @@ int main()
         B_Tree b( "foo.dtb" );
 
         // Create new transaction
-        B_Tree::Transaction_ID t = b.new_txn();
+        B_Tree::Txn t = b.new_txn();
 
         // Add value to b tree as a transaction
         B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
@@ -61,7 +63,30 @@ int main()
         B_Tree b( "foo.dtb" );
 
         // Create a second transaction
-        B_Tree::Transaction_ID t = b.new_txn();
+        B_Tree::Txn t = b.new_txn();
+
+        // Add value to b tree as a transaction
+        B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;
+        snprintf( (char*)v.val, sizeof( v.val ), "0x%08x", k );
+        b.insert( k, v, t );
+
+        // Commit transaction to ensure value persists
+        b.txn_commit( t );
+    }
+
+    {
+        // Reopen tree to verify previous insertion persisted
+        B_Tree b( "foo.dtb" );
+        b.print();
+        std::cout << std::endl;
+    }
+
+    {
+        // Reopen tree to verify previous insertion persisted
+        B_Tree b( "foo.dtb" );
+
+        // Create a second transaction
+        B_Tree::Txn t = b.new_txn();
 
         // Add value to b tree as a transaction
         B_Tree::Key k = ( rand() << 16 ) | ( rand() & 0xffff ) & 0xffffffff;

@@ -1,0 +1,11 @@
+**/CMakeFiles
+**/CMakeCache.txt
+**/Makefile
+**/cmake_install.cmake
+**/*.a
+
+**/.vscode
+
+**/*.dtb
+
+final/distr_log_db_test

@@ -16,7 +16,7 @@ class B_Tree
 
     static constexpr uint32_t Tree_Node_Order = 25;
     static constexpr uint32_t Leaf_Node_Order = 25;
-    static constexpr uint32_t Log_Size = 15;
+    static constexpr uint32_t Log_Size = 5;
 
     static constexpr uint32_t Max_Num_Tree_Nodes = 10;
     static constexpr uint32_t Max_Num_Leaf_Nodes = 100;
@@ -24,28 +24,52 @@ class B_Tree
 
     struct Val
     {
-        uint8_t val[32];
+        uint8_t val[16];
+        Val& operator=( const Val& a )
+        {
+            memcpy( this, &a, sizeof( Val ) );
+            return *this;
+        }
     };
     typedef uint32_t Key;
+    typedef uint32_t Txn;
+
+    struct KeyVal
+    {
+        Key k;
+        Val v;
+    };
+
+    struct KeyValTxn
+    {
+        Key k;
+        Val v;
+        Txn t;
+    };
+
+    enum TxnState
+    {
+        TxnState_Invalid,
+        TxnState_Current,
+        TxnState_Aborted,
+        TxnState_Committed,
+    };
 
     struct Page
     {
         uint8_t _raw_[ 1024 ];
     };
 
-    typedef uint32_t Transaction_ID;
-
     struct Node
     {
         virtual void split( Node*& b ) = 0;
         virtual bool find( const Key& k, Val& v ) = 0;
-        virtual void insert( const Key& k, const Val& v, Transaction_ID t ) = 0;
+        virtual void insert( const Key& k, const Val& v, Txn t ) = 0;
         virtual Key largest() const = 0;
         virtual Key smallest() const = 0;
         virtual uint32_t size() const  = 0;
         virtual uint32_t max_size() const = 0;
         virtual void print( size_t depth = 0 ) const = 0;
-        virtual uint32_t index( Key k ) const = 0;
         virtual uint32_t node_id() const = 0;
 
         B_Tree* _mPar;
@@ -55,39 +79,57 @@ class B_Tree
 
     struct Leaf_Node : Node
     {
-        union
+        struct Data
         {
-            struct
+            union
             {
-                uint32_t _mSize;
-                uint32_t _mNodeId;
-                Key _mKeys[ Leaf_Node_Order ];
-                Val _mVals[ Leaf_Node_Order ];
+                struct
+                {
+                    char foo[24];
+                    uint32_t _mSize;
+                    KeyVal _mKVs[ Leaf_Node_Order ];
+                };
+                Page _mPage;
             };
-            Page _mPage;
+            void insert( const Key& k, const Val& v );
+            bool find( const Key& k, Val& v );
+            uint32_t index( Key k, uint32_t start, uint32_t end ) const;
+            uint32_t index( Key k ) const;
+            void remove( Key k );
         };
-        union
+        struct Log
         {
-            struct
+            union
             {
-                uint32_t _mLogSize;
-                Transaction_ID _mLogTxns[ Log_Size ];
-                Key            _mLogKeys[ Log_Size ];
-                Val            _mLogVals[ Log_Size ];
+                struct
+                {
+                    char foo[24];
+                    uint32_t _mSize;
+                    KeyValTxn _mKVTs[ Log_Size ];
+                };
+                Page _mPage;
             };
-            Page _mLogPage;
+            void insert( const Key& k, const Val& v, Txn t );
+            uint32_t index( Key k, uint32_t start, uint32_t end ) const;
+            uint32_t index( Key k ) const;
+            void remove( Key k );
         };
+
+        Data _mStored, _mCurrent;
+        Log _mLog;
+
+        uint32_t _mNodeId;
+        bool _mDataModified;
 
         void split( Node*& b );
         bool find( const Key& k, Val& v );
-        void insert( const Key& k, const Val& v, Transaction_ID t );
-        Key largest() const { return _mKeys[ _mSize-1 ]; }
-        Key smallest() const { return _mKeys[ 0 ]; }
-        uint32_t size() const  { return _mSize; }
+        void insert( const Key& k, const Val& v, Txn t );
+        Key largest() const { return _mCurrent._mKVs[ _mCurrent._mSize-1 ].k; }
+        Key smallest() const { return _mCurrent._mKVs[ 0 ].k; }
+        uint32_t size() const  { return _mCurrent._mSize; }
         uint32_t max_size() const { return Leaf_Node_Order; };
         void print( size_t depth = 0 ) const;
-        uint32_t index( Key k, uint32_t start, uint32_t end ) const;
-        uint32_t index( Key k ) const;
+        void shorten_log();
         uint32_t node_id() const { return _mNodeId; }
 
         Leaf_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists=false );
@@ -100,6 +142,7 @@ class B_Tree
         {
             struct
             {
+                char foo[24];
                 uint32_t _mSize;
                 uint32_t _mNodeId;
                 uint32_t _mChildNodes[ Tree_Node_Order ];
@@ -111,7 +154,7 @@ class B_Tree
         void split( Node*& b );
         bool find( const Key& k, Val& v );
         Node* find( const Key& k );
-        void insert( const Key& k, const Val& v, Transaction_ID t );
+        void insert( const Key& k, const Val& v, Txn t );
         void insert( const Node* v );
         Key largest() const { return _mPar->unswizzle( _mChildNodes [ _mSize-1 ] )->largest(); }
         Key smallest() const { return _mPar->unswizzle( _mChildNodes[ 0 ] )->smallest(); }
@@ -151,13 +194,13 @@ class B_Tree
             struct
             {
                 uint32_t _mNumTransactions;
-                Transaction_ID _mTransactions[100];
+                Txn _mTransactions[100];
             };
             Page _mPage;
         };
     };
 
-    void insert( const Key& k, const Val& v, Transaction_ID t );
+    void insert( const Key& k, const Val& v, Txn t );
     void print();
     bool find( const Key& k, Val& v ) { return unswizzle( _mHeader._mRootId )->find( k, v ); }
 
@@ -179,16 +222,18 @@ class B_Tree
     void fetch_node( Tree_Node* n, uint32_t idx );
     void fetch_node( Leaf_Node* n, uint32_t idx );
 
-    void remove_txn( Transactions& txns, Transaction_ID t );
-    void add_txn( Transactions& txns, Transaction_ID t );
+    void remove_txn( Transactions& txns, Txn t );
+    void add_txn( Transactions& txns, Txn t );
 
     void sync_header_txns();
 
-    Transaction_ID new_txn();
-    void txn_commit( Transaction_ID t );
-    void txn_abort( Transaction_ID t );
+    Txn new_txn();
+    void txn_commit( Txn t );
+    void txn_abort( Txn t );
 
-    bool log_valid( Transaction_ID t );
+    TxnState txn_state( Txn t );
+
+    Tree_Node* _mRoot();
 
     B_Tree( std::string file_name, bool reset=false );
     ~B_Tree();
@@ -197,8 +242,7 @@ class B_Tree
     static constexpr std::streamoff Abort_Txns_Offset = Curr_Txns_Offset + sizeof( Transactions::_mPage );
     static constexpr std::streamoff Tree_Node_Offset = Abort_Txns_Offset + sizeof( Transactions::_mPage );
     static constexpr std::streamoff Leaf_Node_Offset = Tree_Node_Offset + Max_Num_Tree_Nodes * sizeof( Tree_Node::_mPage );
-    static constexpr std::streamoff Leaf_Log_Offset = Leaf_Node_Offset + Max_Num_Leaf_Nodes * sizeof( Leaf_Node::_mPage );
-    static constexpr std::streamoff File_Size = Leaf_Log_Offset + Max_Num_Leaf_Nodes * sizeof( Leaf_Node::_mLogPage );
+    static constexpr std::streamoff File_Size = Leaf_Node_Offset + Max_Num_Leaf_Nodes * ( sizeof( Leaf_Node::_mLog ) + sizeof( Leaf_Node::_mStored ) );
 };
 
 std::ostream& operator<<( std::ostream& os, const B_Tree::Page& p );

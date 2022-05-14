@@ -1,4 +1,4 @@
-#include "b_plus.hpp"
+#include "distr_log_db/b_plus.hpp"
 
 #include <cassert>
 #include <cstring>
@@ -9,6 +9,7 @@ B_Tree::Tree_Node::Tree_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
     _mPar = _aPar;
     if( exists )
     {
+     
         _mPar->fetch_node( this, _aNodeId );
     }
     else
@@ -21,6 +22,7 @@ B_Tree::Tree_Node::Tree_Node( B_Tree* _aPar, uint32_t _aNodeId, bool exists )
 
 B_Tree::Tree_Node::~Tree_Node()
 {
+    snprintf( foo, sizeof( foo ), "\nTree: %02x\n", _mNodeId );
     _mPar->store_node( this, _mNodeId );
 }
 
@@ -50,7 +52,7 @@ bool B_Tree::Tree_Node::find( const Key& k, Val& v )
     return _mPar->unswizzle( _mChildNodes[idx] )->find( k, v );
 }
 
-void B_Tree::Tree_Node::insert( const Key& k, const Val& v, Transaction_ID t )
+void B_Tree::Tree_Node::insert( const Key& k, const Val& v, Txn t )
 {
     uint32_t i;
 
